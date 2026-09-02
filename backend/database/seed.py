@@ -19,6 +19,34 @@ from backend.services.auth import get_password_hash
 from backend.services.fleet_intelligence import calculate_utilization
 
 
+from sqlalchemy import text
+
+def ensure_schema_migrations():
+    """Ensure newly added columns exist on pre-existing PostgreSQL/SQLite tables."""
+    statements = [
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS engine_hours_at_checkout FLOAT DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS idle_hours_at_checkout FLOAT DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS fuel_usage_at_checkout FLOAT DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS engine_hours_at_checkin FLOAT DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS idle_hours_at_checkin FLOAT DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS fuel_usage_at_checkin FLOAT DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS engine_hours_at_checkout FLOAT DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS idle_hours_at_checkout FLOAT DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS fuel_usage_at_checkout FLOAT DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_operating_hours FLOAT DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_idle_hours FLOAT DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_fuel_used FLOAT DEFAULT 0.0;",
+    ]
+    try:
+        with engine.begin() as conn:
+            for stmt in statements:
+                try:
+                    conn.execute(text(stmt))
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"Schema migration notice: {e}")
+
 def seed_database():
     """
     Idempotent seed: creates schema tables if absent (additive only),
@@ -27,6 +55,7 @@ def seed_database():
     """
     # create_all is safe — it creates missing tables/columns without touching data
     Base.metadata.create_all(bind=engine)
+    ensure_schema_migrations()
 
     db: Session = SessionLocal()
     try:

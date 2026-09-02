@@ -84,19 +84,26 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
     checkout_idle = rental.idle_hours_at_checkout if (rental.idle_hours_at_checkout is not None and rental.idle_hours_at_checkout > 0) else 0.0
     checkout_fuel = rental.fuel_usage_at_checkout if (rental.fuel_usage_at_checkout is not None and rental.fuel_usage_at_checkout > 0) else 0.0
 
-    # Fallback for old/seeded rentals created before baseline capture was added:
-    if checkout_eng == 0.0 and checkin_eng > 0.0:
+    # Fallback for old/seeded rentals or when checkout baseline was unrecorded/0.0:
+    if checkout_eng == 0.0 or (checkin_eng - checkout_eng) > (actual_hours * 24.0 + 50.0):
         from backend.models.domain import UsageLog
+        # Search for a UsageLog recorded right before or near checkout_time
         earliest_log = db.query(UsageLog).filter(
             UsageLog.equipment_id == rental.equipment_id,
-            UsageLog.timestamp >= checkout_time
-        ).order_by(UsageLog.timestamp.asc()).first()
+            UsageLog.timestamp <= checkout_time + datetime.timedelta(minutes=30)
+        ).order_by(UsageLog.timestamp.desc()).first()
 
-        if earliest_log and earliest_log.engine_hours > 0:
+        if not earliest_log:
+            earliest_log = db.query(UsageLog).filter(
+                UsageLog.equipment_id == rental.equipment_id,
+                UsageLog.timestamp >= checkout_time
+            ).order_by(UsageLog.timestamp.asc()).first()
+
+        if earliest_log and earliest_log.engine_hours > 0 and (checkin_eng - earliest_log.engine_hours) <= (actual_hours * 24.0 + 50.0):
             checkout_eng = earliest_log.engine_hours
             checkout_idle = earliest_log.idle_hours
         else:
-            # If no checkout baseline exists, set baseline = checkin so lifetime meter (680.44 hrs) is NEVER billed as rental usage
+            # If no valid log baseline exists, set baseline = checkin_eng so cumulative lifetime meter (e.g. 680.44 hrs) is NEVER billed as rental usage
             checkout_eng = checkin_eng
             checkout_idle = checkin_idle
             checkout_fuel = checkin_fuel
