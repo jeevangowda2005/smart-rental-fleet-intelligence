@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { HardHat, Gauge, Fuel, Clock, MapPin, CheckCircle, Plus, Send, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { HardHat, Gauge, Fuel, Clock, MapPin, CheckCircle, Plus, Send, AlertTriangle, ShieldAlert, QrCode } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
+import { QRScannerModal } from '../components/QRScannerModal';
 import { LoadingSpinner, EmptyState } from '../components/StateViews';
 import { rentalService } from '../services/rentalService';
 import { equipmentService } from '../services/equipmentService';
@@ -22,6 +23,7 @@ export const OperatorView = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showCheckinConfirmModal, setShowCheckinConfirmModal] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
 
   // Forms
   const [logForm, setLogForm] = useState({
@@ -189,15 +191,25 @@ export const OperatorView = () => {
           <p className="text-xs text-slate-400">Operator: <strong className="text-white">{user?.name}</strong> ({user?.email})</p>
         </div>
 
-        {!equipmentDetail && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowCheckoutModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-cat-500 hover:bg-cat-600 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl shadow transition"
+            onClick={() => setShowScannerModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-cat-500 hover:bg-cat-600 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-cat-500/20 transition"
           >
-            <Plus className="w-4 h-4" />
-            Check Out Available Machine
+            <QrCode className="w-4 h-4" />
+            Scan QR Code
           </button>
-        )}
+
+          {!equipmentDetail && (
+            <button
+              onClick={() => setShowCheckoutModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition"
+            >
+              <Plus className="w-4 h-4 text-cat-500" />
+              Depot Checkout
+            </button>
+          )}
+        </div>
       </div>
 
       {equipmentDetail ? (
@@ -527,6 +539,15 @@ export const OperatorView = () => {
           </div>
         </form>
       </Modal>
+
+      {/* QR/RFID Scanner Modal */}
+      <QRScannerModal
+        isOpen={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        onOperationSuccess={() => {
+          loadOperatorData();
+        }}
+      />
     </MainLayout>
   );
 };

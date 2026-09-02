@@ -19,5 +19,11 @@ export const rentalService = {
   checkin: async (rentalId, notes = '') => {
     const response = await api.post(`/api/rentals/${rentalId}/checkin`, { rental_id: rentalId, notes });
     return response.data;
+  },
+
+  checkinByEquipment: async (idOrCode, notes = '') => {
+    const response = await api.post(`/api/rentals/checkin-by-equipment/${idOrCode}`, { notes });
+    return response.data;
   }
 };
+

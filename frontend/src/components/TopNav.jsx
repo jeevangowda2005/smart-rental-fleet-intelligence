@@ -1,9 +1,11 @@
-import React from 'react';
-import { LogOut, Bell, User as UserIcon, Activity } from 'lucide-react';
+import React, { useState } from 'react';
+import { LogOut, Bell, User as UserIcon, Activity, QrCode } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { QRScannerModal } from './QRScannerModal';
 
 export const TopNav = ({ title = 'Fleet Intelligence' }) => {
   const { user, logout } = useAuth();
+  const [showScannerModal, setShowScannerModal] = useState(false);
 
   return (
     <header className="h-16 bg-industrial-card/80 backdrop-blur-md border-b border-industrial-border px-6 flex items-center justify-between sticky top-0 z-40">
@@ -16,7 +18,17 @@ export const TopNav = ({ title = 'Fleet Intelligence' }) => {
       </div>
 
       {/* Profile & Controls */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        {/* Quick QR Scanner Launcher Button */}
+        <button
+          onClick={() => setShowScannerModal(true)}
+          title="Scan Equipment QR Tag"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cat-500 hover:bg-cat-600 text-black font-extrabold text-xs uppercase tracking-wider shadow-md shadow-cat-500/20 transition"
+        >
+          <QrCode className="w-4 h-4" />
+          <span className="hidden sm:inline">QR Scan</span>
+        </button>
+
         {/* Notifications Mock Indicator */}
         <button
           title="Telematics Alerts"
@@ -47,6 +59,16 @@ export const TopNav = ({ title = 'Fleet Intelligence' }) => {
           <span className="hidden md:inline">Sign Out</span>
         </button>
       </div>
+
+      <QRScannerModal
+        isOpen={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        onOperationSuccess={() => {
+          if (window.location.reload) {
+            window.location.reload();
+          }
+        }}
+      />
     </header>
   );
 };

@@ -164,3 +164,52 @@ def checkin_equipment(
     db.commit()
     db.refresh(rental)
     return format_rental_response(rental)
+
+@router.post("/checkin-by-equipment/{id_or_code}", response_model=RentalResponse)
+def checkin_equipment_by_code(
+    id_or_code: str,
+    request: Optional[RentalCheckin] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if id_or_code.isdigit():
+        eq = db.query(Equipment).filter(Equipment.id == int(id_or_code)).first()
+    else:
+        eq = db.query(Equipment).filter(Equipment.equipment_id == id_or_code).first()
+
+    if not eq:
+        raise HTTPException(status_code=404, detail="Equipment asset not found")
+
+    rental = db.query(Rental).filter(
+        Rental.equipment_id == eq.id,
+        Rental.status.in_([RentalStatus.ACTIVE, RentalStatus.OVERDUE])
+    ).first()
+
+    if not rental:
+        if eq.status == EquipmentStatus.AVAILABLE:
+            raise HTTPException(status_code=400, detail=f"Equipment {eq.equipment_id} is already checked in and AVAILABLE")
+        else:
+            raise HTTPException(status_code=400, detail=f"No active rental contract found for equipment {eq.equipment_id}")
+
+    if current_user.role == UserRole.OPERATOR and rental.operator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to check in this rental assignment")
+
+    rental.actual_return_time = datetime.utcnow()
+    rental.status = RentalStatus.COMPLETED
+
+    eq.status = EquipmentStatus.AVAILABLE
+    eq.operator_id = None
+
+    # Auto-resolve overdue alerts if present
+    overdue_alert = db.query(Alert).filter(
+        Alert.equipment_id == eq.id,
+        Alert.alert_type == "OVERDUE_RENTAL",
+        Alert.is_resolved == False
+    ).first()
+    if overdue_alert:
+        overdue_alert.is_resolved = True
+
+    db.commit()
+    db.refresh(rental)
+    return format_rental_response(rental)
+

@@ -8,6 +8,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
+import { QRScannerModal } from '../components/QRScannerModal';
 import { LoadingSpinner, ErrorState } from '../components/StateViews';
 import { equipmentService } from '../services/equipmentService';
 import { siteService } from '../services/siteService';
@@ -31,6 +32,7 @@ export const EquipmentPage = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
   const [selectedItemForQR, setSelectedItemForQR] = useState(null);
 
   // Add Machine Modal
@@ -266,15 +268,25 @@ export const EquipmentPage = () => {
             ))}
           </div>
 
-          {isManager && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-cat-500 hover:bg-cat-600 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl shadow transition"
+              onClick={() => setShowScannerModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-cat-500 hover:bg-cat-600 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-cat-500/20 transition"
             >
-              <Plus className="w-4 h-4" />
-              Add Fleet Machine
+              <QrCode className="w-4 h-4" />
+              Scan Equipment QR
             </button>
-          )}
+
+            {isManager && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition"
+              >
+                <Plus className="w-4 h-4 text-cat-500" />
+                Add Machine
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-industrial-border/60">
@@ -588,6 +600,15 @@ export const EquipmentPage = () => {
           </div>
         )}
       </Modal>
+
+      {/* QR/RFID Scanner Modal */}
+      <QRScannerModal
+        isOpen={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        onOperationSuccess={() => {
+          loadData();
+        }}
+      />
     </MainLayout>
   );
 };
