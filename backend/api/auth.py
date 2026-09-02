@@ -27,18 +27,25 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/register", response_model=UserResponse)
 def register(request: UserCreate, db: Session = Depends(get_db)):
+    """
+    Public self-registration endpoint.
+    SECURITY: Role is unconditionally forced to OPERATOR regardless of
+    any value supplied in the request body. Manager accounts must be
+    provisioned exclusively through the backend seed / admin process.
+    """
     existing = db.query(User).filter(User.email == request.email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
+
+    # SECURITY: Force OPERATOR — never trust the client-supplied role.
     user = User(
         name=request.name,
         email=request.email,
         password_hash=get_password_hash(request.password),
-        role=request.role
+        role=UserRole.OPERATOR
     )
     db.add(user)
     db.commit()

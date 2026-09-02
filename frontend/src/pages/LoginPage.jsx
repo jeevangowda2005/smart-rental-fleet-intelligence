@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Shield, Zap, Lock, Mail, ArrowRight, HardHat, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -103,6 +103,15 @@ export const LoginPage = () => {
             {loading ? 'Authenticating...' : 'Access Telematics Platform'}
             <ArrowRight className="w-4 h-4" />
           </button>
+
+          <div className="text-center pt-1">
+            <p className="text-xs text-slate-400">
+              New User?{' '}
+              <Link to="/register" className="text-cat-500 font-bold hover:underline">
+                Create Account
+              </Link>
+            </p>
+          </div>
         </form>
 
         {/* Demo Quick Shortcuts */}
