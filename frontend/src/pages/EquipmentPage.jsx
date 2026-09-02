@@ -9,6 +9,7 @@ import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { QRScannerModal } from '../components/QRScannerModal';
+import { EquipmentQRModal } from '../components/EquipmentQRModal';
 import { LoadingSpinner, ErrorState } from '../components/StateViews';
 import { equipmentService } from '../services/equipmentService';
 import { siteService } from '../services/siteService';
@@ -374,7 +375,19 @@ export const EquipmentPage = () => {
                   <StatusBadge status={detailedEquipment.status} />
                 </div>
                 <h3 className="text-xl font-extrabold text-white mt-1">{detailedEquipment.model}</h3>
-                <p className="text-xs text-slate-400 font-mono">{detailedEquipment.equipment_type}</p>
+                <div className="flex items-center gap-3 mt-1">
+                  <p className="text-xs text-slate-400 font-mono">{detailedEquipment.equipment_type}</p>
+                  <button
+                    onClick={() => {
+                      setSelectedItemForQR(detailedEquipment);
+                      setShowQRModal(true);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-slate-950 hover:bg-slate-800 border border-slate-700 text-cat-500 rounded text-[11px] font-bold uppercase transition"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    View QR Tag
+                  </button>
+                </div>
               </div>
 
               {/* Health Score Summary Box */}
@@ -570,36 +583,12 @@ export const EquipmentPage = () => {
         </form>
       </Modal>
 
-      {/* QR Code Tag Modal */}
-      <Modal
+      {/* Scannable Real QR Code Tag Modal */}
+      <EquipmentQRModal
         isOpen={showQRModal}
         onClose={() => setShowQRModal(false)}
-        title={`Asset Tag: ${selectedItemForQR?.equipment_id}`}
-        maxWidth="max-w-sm"
-      >
-        {selectedItemForQR && (
-          <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
-            <div className="p-4 bg-white rounded-2xl shadow-xl">
-              <div className="w-48 h-48 bg-slate-950 p-2 rounded flex flex-col justify-between">
-                <div className="flex justify-between">
-                  <div className="w-12 h-12 border-4 border-white bg-slate-950" />
-                  <div className="w-12 h-12 border-4 border-white bg-slate-950" />
-                </div>
-                <div className="text-center font-mono text-[10px] text-cat-500 font-bold tracking-widest uppercase">
-                  {selectedItemForQR.equipment_id}
-                </div>
-                <div className="flex justify-between">
-                  <div className="w-12 h-12 border-4 border-white bg-slate-950" />
-                  <div className="w-6 h-6 bg-white" />
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-slate-400 font-mono">
-              Scan asset tag for quick field operator dispatch.
-            </p>
-          </div>
-        )}
-      </Modal>
+        equipment={selectedItemForQR}
+      />
 
       {/* QR/RFID Scanner Modal */}
       <QRScannerModal

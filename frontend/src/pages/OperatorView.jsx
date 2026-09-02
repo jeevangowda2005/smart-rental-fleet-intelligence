@@ -4,6 +4,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { QRScannerModal } from '../components/QRScannerModal';
+import { EquipmentQRModal } from '../components/EquipmentQRModal';
 import { LoadingSpinner, EmptyState } from '../components/StateViews';
 import { rentalService } from '../services/rentalService';
 import { equipmentService } from '../services/equipmentService';
@@ -24,6 +25,7 @@ export const OperatorView = () => {
   const [showCheckinConfirmModal, setShowCheckinConfirmModal] = useState(false);
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [showScannerModal, setShowScannerModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   // Forms
   const [logForm, setLogForm] = useState({
@@ -229,6 +231,14 @@ export const OperatorView = () => {
 
               <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge status={equipmentDetail.status} />
+
+                <button
+                  onClick={() => setShowQRModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-cat-500 text-xs font-bold uppercase rounded-xl transition"
+                >
+                  <QrCode className="w-4 h-4" />
+                  View Asset QR
+                </button>
 
                 <button
                   onClick={() => setShowIssueModal(true)}
@@ -547,6 +557,13 @@ export const OperatorView = () => {
         onOperationSuccess={() => {
           loadOperatorData();
         }}
+      />
+
+      {/* Equipment Scannable QR Tag Modal */}
+      <EquipmentQRModal
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+        equipment={equipmentDetail}
       />
     </MainLayout>
   );

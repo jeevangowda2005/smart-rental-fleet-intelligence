@@ -5,6 +5,7 @@ import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { QRScannerModal } from '../components/QRScannerModal';
+import { EquipmentQRModal } from '../components/EquipmentQRModal';
 import { LoadingSpinner, ErrorState } from '../components/StateViews';
 import { rentalService } from '../services/rentalService';
 import { equipmentService } from '../services/equipmentService';
@@ -23,6 +24,8 @@ export const RentalsPage = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showCheckinConfirmModal, setShowCheckinConfirmModal] = useState(false);
   const [showScannerModal, setShowScannerModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedItemForQR, setSelectedItemForQR] = useState(null);
   const [selectedRentalForCheckin, setSelectedRentalForCheckin] = useState(null);
 
   const [checkoutData, setCheckoutData] = useState({
@@ -97,9 +100,25 @@ export const RentalsPage = () => {
       header: 'Machine ID & Series',
       accessor: 'equipment_code',
       render: (item) => (
-        <div>
-          <div className="font-mono font-bold text-cat-500">{item.equipment_code}</div>
-          <div className="text-xs text-slate-400 font-mono">{item.equipment_model}</div>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              setSelectedItemForQR({
+                equipment_id: item.equipment_code,
+                model: item.equipment_model,
+                status: item.status
+              });
+              setShowQRModal(true);
+            }}
+            title="View Machine QR Tag"
+            className="p-1.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-cat-500 transition"
+          >
+            <QrCode className="w-4 h-4" />
+          </button>
+          <div>
+            <div className="font-mono font-bold text-cat-500">{item.equipment_code}</div>
+            <div className="text-xs text-slate-400 font-mono">{item.equipment_model}</div>
+          </div>
         </div>
       )
     },
@@ -351,6 +370,13 @@ export const RentalsPage = () => {
         onOperationSuccess={() => {
           loadData();
         }}
+      />
+
+      {/* Equipment Scannable QR Tag Modal */}
+      <EquipmentQRModal
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+        equipment={selectedItemForQR}
       />
     </MainLayout>
   );
