@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { HardHat, Gauge, Fuel, Clock, MapPin, CheckCircle, Plus, Send, AlertTriangle, ShieldAlert, QrCode } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { HardHat, Gauge, Fuel, Clock, MapPin, CheckCircle, Plus, Send, AlertTriangle, ShieldAlert, QrCode, Receipt, FileText } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
@@ -19,7 +20,9 @@ export const OperatorView = () => {
   const [equipmentDetail, setEquipmentDetail] = useState(null);
   const [availableEquipment, setAvailableEquipment] = useState([]);
   const [sites, setSites] = useState([]);
+  const [myRentals, setMyRentals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Modal States
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -54,14 +57,16 @@ export const OperatorView = () => {
   const loadOperatorData = async () => {
     setLoading(true);
     try {
-      const [rental, availableEq, sitesData] = await Promise.all([
+      const [rental, availableEq, sitesData, rentalsList] = await Promise.all([
         rentalService.getMyActiveRental(),
         equipmentService.getEquipment({ status: 'AVAILABLE' }),
-        siteService.getSites()
+        siteService.getSites(),
+        rentalService.getRentals()
       ]);
       setActiveRental(rental);
       setAvailableEquipment(availableEq);
       setSites(sitesData);
+      setMyRentals(rentalsList);
 
       if (rental && rental.equipment_id) {
         const eq = await equipmentService.getEquipmentById(rental.equipment_id);
@@ -145,10 +150,11 @@ export const OperatorView = () => {
   const confirmCheckin = async () => {
     if (!activeRental) return;
     try {
-      await rentalService.checkin(activeRental.id);
-      addToast('Machine checked in and returned to depot', 'success');
+      const updated = await rentalService.checkin(activeRental.id);
+      addToast('Machine checked in & tax invoice generated successfully!', 'success');
       setShowCheckinConfirmModal(false);
-      loadOperatorData();
+      await loadOperatorData();
+      navigate(`/billing?rental_id=${activeRental.id}`);
     } catch (err) {
       addToast('Failed to check in machine', 'error');
     }
@@ -376,6 +382,58 @@ export const OperatorView = () => {
           onAction={() => setShowCheckoutModal(true)}
         />
       )}
+
+      {/* My Rental & Billing History Section */}
+      <div className="bg-industrial-card border border-industrial-border rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <FileText className="w-4 h-4 text-cat-500" />
+            My Rental History & Billing Records
+          </h4>
+          <button
+            onClick={() => navigate('/billing')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-cat-500 text-xs font-extrabold uppercase rounded-lg transition"
+          >
+            <Receipt className="w-4 h-4" />
+            View All Invoices
+          </button>
+        </div>
+
+        {myRentals.length === 0 ? (
+          <p className="text-xs text-slate-400 font-mono">No rental history records found for your account.</p>
+        ) : (
+          <div className="divide-y divide-industrial-border border border-industrial-border rounded-xl overflow-hidden bg-slate-950/40">
+            {myRentals.map((r) => (
+              <div key={r.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">{r.equipment_code}</span>
+                    <span className="text-slate-400">({r.equipment_model})</span>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    Checkout: {new Date(r.checkout_time).toLocaleDateString()} | Site: {r.site_name}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {r.status === 'COMPLETED' ? (
+                    <button
+                      onClick={() => navigate(`/billing?rental_id=${r.id}`)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-cat-500/10 hover:bg-cat-500/20 border border-cat-500/40 text-cat-500 font-bold rounded-lg text-xs transition"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      View Invoice
+                    </button>
+                  ) : (
+                    <span className="text-emerald-400 font-semibold text-[11px] uppercase">Active Shift Assignment</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Operator Checkout Modal */}
       <Modal

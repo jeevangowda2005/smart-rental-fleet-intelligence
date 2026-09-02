@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Plus, CheckCircle, Clock, AlertCircle, Calendar, User, MapPin, Truck, AlertTriangle, QrCode, Sparkles, Scale, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { FileText, Plus, CheckCircle, Clock, AlertCircle, Calendar, User, MapPin, Truck, AlertTriangle, QrCode, Sparkles, Scale, Activity, Receipt } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
@@ -37,12 +38,21 @@ export const RentalsPage = () => {
   const [checkoutData, setCheckoutData] = useState({
     equipment_id: '',
     site_id: '',
-    operator_id: '2', // Default Operator 1
+    operator_id: '',  // will be set from user.id on mount
     expected_return_days: 7
   });
 
+
   const { isManager, isOperator, user } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
+
+  // Initialize operator_id from the authenticated user's actual ID
+  useEffect(() => {
+    if (user?.id) {
+      setCheckoutData(prev => ({ ...prev, operator_id: String(user.id) }));
+    }
+  }, [user]);
 
   const loadData = async () => {
     setLoading(true);
@@ -211,7 +221,14 @@ export const RentalsPage = () => {
               Check In
             </button>
           ) : (
-            <span className="text-xs text-slate-500 font-mono">Completed</span>
+            <button
+              onClick={() => navigate(`/billing?rental_id=${item.id}`)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-cat-500/10 hover:bg-cat-500/20 border border-cat-500/40 text-cat-500 rounded text-xs font-semibold uppercase tracking-wider transition"
+              title="View Invoice & Billing Details"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              View Bill
+            </button>
           )}
         </div>
       )

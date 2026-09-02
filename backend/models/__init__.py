@@ -9,6 +9,7 @@ from backend.models.domain import (
     UsageLog,
     Alert,
     Maintenance,
+    Billing,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "UsageLog",
     "Alert",
     "Maintenance",
+    "Billing",
 ]

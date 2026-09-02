@@ -277,6 +277,14 @@ def checkin_equipment(
 
     db.commit()
     db.refresh(rental)
+
+    # Auto-generate billing record for this completed rental (idempotent)
+    try:
+        from backend.api.billing import calculate_and_create_billing
+        calculate_and_create_billing(rental, db)
+    except Exception as e:
+        print(f"Billing generation notice for rental {rental_id}: {e}")
+
     return format_rental_response(rental, db)
 
 @router.post("/checkin-by-equipment/{id_or_code}", response_model=RentalResponse)
@@ -325,5 +333,13 @@ def checkin_equipment_by_code(
 
     db.commit()
     db.refresh(rental)
+
+    # Auto-generate billing record for this completed rental (idempotent)
+    try:
+        from backend.api.billing import calculate_and_create_billing
+        calculate_and_create_billing(rental, db)
+    except Exception as e:
+        print(f"Billing generation notice for equipment {eq.equipment_id}: {e}")
+
     return format_rental_response(rental, db)
 

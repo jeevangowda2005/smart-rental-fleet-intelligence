@@ -223,3 +223,54 @@ class DashboardStats(BaseModel):
     avg_fuel_usage: float
     total_sites: int
     active_alerts: int
+
+
+# Billing / Invoice Schemas
+class BillingResponse(BaseModel):
+    id: int
+    rental_id: int
+    equipment_id: int
+    operator_id: int
+    invoice_number: str
+    status: str
+    currency: str
+
+    # Period
+    rental_start: datetime
+    actual_checkin: datetime
+    planned_duration_hours: float
+    actual_duration_hours: float
+
+    # Rate
+    base_rate_per_hour: float
+
+    # Charges
+    rental_charge: float
+    fuel_charge: float
+    idle_charge: float
+    additional_charge: float
+
+    # Totals
+    subtotal: float
+    tax_rate: float
+    tax_amount: float
+    total_amount: float
+
+    # Snapshot info
+    equipment_code: Optional[str] = None
+    equipment_model: Optional[str] = None
+    equipment_type: Optional[str] = None
+    operator_name: Optional[str] = None
+    operator_email: Optional[str] = None
+    site_name: Optional[str] = None
+
+    # Telemetry snapshot
+    engine_hours_at_checkin: float = 0.0
+    idle_hours_at_checkin: float = 0.0
+    fuel_usage_at_checkin: float = 0.0
+
+    generated_at: datetime
+
+    class Config:
+        from_attributes = True
+

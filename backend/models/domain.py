@@ -112,6 +112,7 @@ class Rental(Base):
     equipment = relationship("Equipment", back_populates="rentals")
     operator = relationship("User", back_populates="rentals")
     site = relationship("Site", back_populates="rentals")
+    billing = relationship("Billing", back_populates="rental", uselist=False)
 
 class UsageLog(Base):
     __tablename__ = "usage_logs"
@@ -246,3 +247,64 @@ class Notification(Base):
     user = relationship("User", back_populates="notifications")
     incident = relationship("Incident", back_populates="notifications")
     equipment = relationship("Equipment")
+
+
+class Billing(Base):
+    """
+    Persistent billing/invoice record generated after equipment check-in.
+    One record per completed rental (enforced by unique rental_id FK).
+    All monetary values in INR (₹) by default, matching cost_config.py.
+    """
+    __tablename__ = "billing"
+
+    id = Column(Integer, primary_key=True, index=True)
+    rental_id = Column(Integer, ForeignKey("rentals.id"), nullable=False, unique=True, index=True)
+    equipment_id = Column(Integer, ForeignKey("equipment.id"), nullable=False, index=True)
+    operator_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # Invoice metadata
+    invoice_number = Column(String, unique=True, nullable=False, index=True)
+    status = Column(String, default="PENDING", nullable=False, index=True)  # PENDING / PAID
+    currency = Column(String, default="INR", nullable=False)
+
+    # Rental period
+    rental_start = Column(DateTime, nullable=False)
+    actual_checkin = Column(DateTime, nullable=False)
+    planned_duration_hours = Column(Float, default=0.0)
+    actual_duration_hours = Column(Float, default=0.0)
+
+    # Rate applied
+    base_rate_per_hour = Column(Float, default=0.0)  # ₹/hour operating rate
+
+    # Charge components
+    rental_charge = Column(Float, default=0.0)    # operating hours × rate
+    fuel_charge = Column(Float, default=0.0)      # fuel_usage_liters × fuel cost/liter
+    idle_charge = Column(Float, default=0.0)      # idle_hours × idle cost/hour
+    additional_charge = Column(Float, default=0.0)
+
+    # Totals
+    subtotal = Column(Float, default=0.0)
+    tax_rate = Column(Float, default=0.18)   # 18% GST
+    tax_amount = Column(Float, default=0.0)
+    total_amount = Column(Float, default=0.0)
+
+    # Snapshot values at check-in (for audit / display)
+    equipment_code = Column(String, nullable=True)
+    equipment_model = Column(String, nullable=True)
+    equipment_type = Column(String, nullable=True)
+    operator_name = Column(String, nullable=True)
+    operator_email = Column(String, nullable=True)
+    site_name = Column(String, nullable=True)
+
+    # Telemetry snapshot at check-in
+    engine_hours_at_checkin = Column(Float, default=0.0)
+    idle_hours_at_checkin = Column(Float, default=0.0)
+    fuel_usage_at_checkin = Column(Float, default=0.0)
+
+    generated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    # Relationships
+    rental = relationship("Rental", back_populates="billing")
+    equipment = relationship("Equipment")
+    operator = relationship("User")
+

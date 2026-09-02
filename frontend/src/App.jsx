@@ -16,6 +16,7 @@ import { OperatorView } from './pages/OperatorView';
 import { ExecutivePage } from './pages/ExecutivePage';
 import { PredictiveMaintenancePage } from './pages/PredictiveMaintenancePage';
 import { IncidentCommandPage } from './pages/IncidentCommandPage';
+import { BillingPage } from './pages/BillingPage';
 
 const HomeRedirect = () => {
   const { user } = useAuth();
@@ -110,6 +111,15 @@ export const App = () => {
               element={
                 <ProtectedRoute allowedRoles={['MANAGER', 'OPERATOR']}>
                   <AlertsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/billing"
+              element={
+                <ProtectedRoute allowedRoles={['MANAGER', 'OPERATOR']}>
+                  <BillingPage />
                 </ProtectedRoute>
               }
             />

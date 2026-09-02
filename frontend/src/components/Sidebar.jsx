@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   Zap,
-  TrendingUp
+  TrendingUp,
+  Receipt
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,6 +26,7 @@ export const Sidebar = () => {
     { to: '/predictive-maintenance', label: 'Predictive Maintenance', icon: ShieldCheck },
     { to: '/equipment', label: 'Equipment Directory', icon: Truck },
     { to: '/rentals', label: 'Rental Operations', icon: FileText },
+    { to: '/billing', label: 'Billing & Invoices', icon: Receipt },
     { to: '/sites', label: 'Mining & Project Sites', icon: MapPin },
     { to: '/maintenance', label: 'Servicing & Repairs', icon: Wrench },
     { to: '/alerts', label: 'Telematics Alerts', icon: AlertTriangle },
@@ -34,6 +36,7 @@ export const Sidebar = () => {
     { to: '/operator', label: 'My Assigned Machine', icon: HardHat },
     { to: '/equipment', label: 'Available Fleet', icon: Truck },
     { to: '/rentals', label: 'Active Rentals', icon: FileText },
+    { to: '/billing', label: 'Billing & Invoices', icon: Receipt },
     { to: '/alerts', label: 'Telemetry Alerts', icon: AlertTriangle },
   ];
 
