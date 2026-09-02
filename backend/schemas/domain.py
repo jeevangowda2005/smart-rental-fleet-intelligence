@@ -119,8 +119,26 @@ class RentalResponse(BaseModel):
     status: RentalStatus
     equipment_code: Optional[str] = None
     equipment_model: Optional[str] = None
+    equipment_category: Optional[str] = None
     operator_name: Optional[str] = None
     site_name: Optional[str] = None
+    planned_duration_days: Optional[float] = 0.0
+    elapsed_duration_days: Optional[float] = 0.0
+    remaining_duration_days: Optional[float] = 0.0
+    planned_duration_hours: Optional[float] = 0.0
+    elapsed_duration_hours: Optional[float] = 0.0
+    remaining_duration_hours: Optional[float] = 0.0
+    progress_pct: Optional[float] = 0.0
+    utilization: Optional[float] = 0.0
+    engine_hours: Optional[float] = 0.0
+    operating_hours: Optional[float] = 0.0
+    idle_hours: Optional[float] = 0.0
+    fuel_usage: Optional[float] = 0.0
+    health_status: Optional[str] = "HEALTHY"
+    health_score: Optional[float] = 100.0
+    active_alerts_count: Optional[int] = 0
+    early_return_opportunity: Optional[dict] = None
+    lifecycle_stages: Optional[list] = None
 
     class Config:
         from_attributes = True

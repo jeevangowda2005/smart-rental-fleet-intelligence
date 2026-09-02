@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Plus, CheckCircle, Clock, AlertCircle, Calendar, User, MapPin, Truck, AlertTriangle, QrCode } from 'lucide-react';
+import { FileText, Plus, CheckCircle, Clock, AlertCircle, Calendar, User, MapPin, Truck, AlertTriangle, QrCode, Sparkles, Scale, Activity } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { DataTable } from '../components/DataTable';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import { QRScannerModal } from '../components/QRScannerModal';
 import { EquipmentQRModal } from '../components/EquipmentQRModal';
+import { RentalIntelligenceCard } from '../components/RentalIntelligenceCard';
+import { RentalDetailModal } from '../components/RentalDetailModal';
+import { RentalWhatIfModal } from '../components/RentalWhatIfModal';
 import { LoadingSpinner, ErrorState } from '../components/StateViews';
 import { rentalService } from '../services/rentalService';
 import { equipmentService } from '../services/equipmentService';
@@ -27,6 +30,9 @@ export const RentalsPage = () => {
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedItemForQR, setSelectedItemForQR] = useState(null);
   const [selectedRentalForCheckin, setSelectedRentalForCheckin] = useState(null);
+  const [selectedRentalForDetail, setSelectedRentalForDetail] = useState(null);
+  const [selectedRentalForWhatIf, setSelectedRentalForWhatIf] = useState(null);
+  const [activeRentalCard, setActiveRentalCard] = useState(null);
 
   const [checkoutData, setCheckoutData] = useState({
     equipment_id: '',
@@ -50,6 +56,13 @@ export const RentalsPage = () => {
       setRentals(rentalsData);
       setAvailableEquipment(eqData);
       setSites(sitesData);
+
+      const active = rentalsData.find(r => r.status === 'ACTIVE' || r.status === 'OVERDUE');
+      if (active) {
+        setActiveRentalCard(active);
+      } else {
+        setActiveRentalCard(rentalsData[0] || null);
+      }
     } catch (err) {
       setError('Unable to load rental contracts.');
     } finally {
@@ -115,8 +128,13 @@ export const RentalsPage = () => {
           >
             <QrCode className="w-4 h-4" />
           </button>
-          <div>
-            <div className="font-mono font-bold text-cat-500">{item.equipment_code}</div>
+          <div className="cursor-pointer" onClick={() => { setActiveRentalCard(item); setSelectedRentalForDetail(item); }}>
+            <div className="font-mono font-bold text-cat-500 hover:underline flex items-center gap-1.5">
+              {item.equipment_code}
+              {item.early_return_opportunity && (
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" title="Early Return Opportunity Detected" />
+              )}
+            </div>
             <div className="text-xs text-slate-400 font-mono">{item.equipment_model}</div>
           </div>
         </div>
@@ -132,20 +150,16 @@ export const RentalsPage = () => {
       )
     },
     {
-      header: 'Assigned Operator',
+      header: 'Progress & Intelligence',
       render: (item) => (
-        <div className="flex items-center gap-1.5 text-xs text-slate-300">
-          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span>{item.operator_name}</span>
+        <div className="text-xs font-mono">
+          <div className="text-slate-200">
+            {item.elapsed_duration_days || 0}d / {item.planned_duration_days || 0}d ({item.progress_pct || 0}%)
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Util: <span className="text-emerald-400 font-bold">{item.utilization || 0}%</span> | Rem: <span className="text-cat-500">{item.remaining_duration_days || 0}d</span>
+          </div>
         </div>
-      )
-    },
-    {
-      header: 'Checkout Date',
-      render: (item) => (
-        <span className="font-mono text-xs text-slate-300">
-          {new Date(item.checkout_time).toLocaleDateString()}
-        </span>
       )
     },
     {
@@ -163,26 +177,49 @@ export const RentalsPage = () => {
     {
       header: 'Rental Actions',
       render: (item) => (
-        item.status === 'ACTIVE' || item.status === 'OVERDUE' ? (
+        <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              setSelectedRentalForCheckin(item);
-              setShowCheckinConfirmModal(true);
+              setActiveRentalCard(item);
+              setSelectedRentalForDetail(item);
             }}
-            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-950/50 hover:bg-emerald-900/90 border border-emerald-500/40 text-emerald-300 rounded text-xs font-semibold uppercase tracking-wider transition"
+            className="p-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded text-xs transition"
+            title="Inspect 7-Stage Lifecycle Timeline"
           >
-            <CheckCircle className="w-3.5 h-3.5" />
-            Check In Machine
+            <Activity className="w-3.5 h-3.5 text-cat-500" />
           </button>
-        ) : (
-          <span className="text-xs text-slate-500 font-mono">Completed</span>
-        )
+
+          {isManager && (item.status === 'ACTIVE' || item.status === 'OVERDUE') && (
+            <button
+              onClick={() => setSelectedRentalForWhatIf(item)}
+              className="p-1.5 bg-cat-500/10 hover:bg-cat-500/20 border border-cat-500/40 text-cat-500 rounded text-xs transition"
+              title="Run What-If Simulation"
+            >
+              <Scale className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {(item.status === 'ACTIVE' || item.status === 'OVERDUE') ? (
+            <button
+              onClick={() => {
+                setSelectedRentalForCheckin(item);
+                setShowCheckinConfirmModal(true);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 bg-emerald-950/50 hover:bg-emerald-900/90 border border-emerald-500/40 text-emerald-300 rounded text-xs font-semibold uppercase tracking-wider transition"
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              Check In
+            </button>
+          ) : (
+            <span className="text-xs text-slate-500 font-mono">Completed</span>
+          )}
+        </div>
       )
     }
   ];
 
   return (
-    <MainLayout title="Rental Contracts & Dispatch">
+    <MainLayout title="Rental Contracts & Fleet Intelligence">
       {/* Header Bar */}
       <div className="flex items-center justify-between">
         <div>
@@ -208,6 +245,20 @@ export const RentalsPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Active Rental Intelligence Card */}
+      {activeRentalCard && (
+        <RentalIntelligenceCard
+          rental={activeRentalCard}
+          onSimulateWhatIf={(r) => setSelectedRentalForWhatIf(r)}
+          onCheckinClick={(r) => {
+            setSelectedRentalForCheckin(r);
+            setShowCheckinConfirmModal(true);
+          }}
+          onViewDetails={(r) => setSelectedRentalForDetail(r)}
+          isOperator={isOperator}
+        />
+      )}
 
       {loading ? (
         <LoadingSpinner label="Loading active rental contracts..." />
@@ -377,6 +428,20 @@ export const RentalsPage = () => {
         isOpen={showQRModal}
         onClose={() => setShowQRModal(false)}
         equipment={selectedItemForQR}
+      />
+
+      {/* 7-Stage Complete Lifecycle Timeline Modal */}
+      <RentalDetailModal
+        isOpen={!!selectedRentalForDetail}
+        onClose={() => setSelectedRentalForDetail(null)}
+        rental={selectedRentalForDetail}
+      />
+
+      {/* What-If Early Return Simulation Modal */}
+      <RentalWhatIfModal
+        isOpen={!!selectedRentalForWhatIf}
+        onClose={() => setSelectedRentalForWhatIf(null)}
+        rental={selectedRentalForWhatIf}
       />
     </MainLayout>
   );

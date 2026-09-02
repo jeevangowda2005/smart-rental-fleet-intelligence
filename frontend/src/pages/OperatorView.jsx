@@ -6,6 +6,7 @@ import { Modal } from '../components/Modal';
 import { QRScannerModal } from '../components/QRScannerModal';
 import { EquipmentQRModal } from '../components/EquipmentQRModal';
 import { LoadingSpinner, EmptyState } from '../components/StateViews';
+import { RentalIntelligenceCard } from '../components/RentalIntelligenceCard';
 import { rentalService } from '../services/rentalService';
 import { equipmentService } from '../services/equipmentService';
 import { siteService } from '../services/siteService';
@@ -278,12 +279,10 @@ export const OperatorView = () => {
               </div>
             </div>
 
-            {/* Active Rental Time Details */}
+            {/* Active Rental Intelligence Card for Operator */}
             {activeRental && (
-              <div className="mt-5 p-4 bg-slate-900/60 border border-slate-800 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-mono">
-                <div><span className="text-slate-400">Checkout Time:</span> <span className="text-white font-bold">{new Date(activeRental.checkout_time).toLocaleString()}</span></div>
-                <div><span className="text-slate-400">Expected Return:</span> <span className="text-cat-500 font-bold">{new Date(activeRental.expected_return_time).toLocaleDateString()}</span></div>
-                <div><span className="text-slate-400">Site Location:</span> <span className="text-slate-200">{activeRental.site_name}</span></div>
+              <div className="mt-5">
+                <RentalIntelligenceCard rental={activeRental} isOperator={true} />
               </div>
             )}
           </div>

@@ -94,6 +94,30 @@ def get_underutilized(
     }
 
 
+from backend.models.domain import User, UserRole, Equipment, Site, EquipmentStatus, UsageLog, Rental, RentalStatus
+from backend.services.rental_intelligence import evaluate_early_return_opportunity
+
+@router.get("/early-return-opportunities")
+def get_early_return_opportunities(
+    current_user: User = Depends(manager_only),
+    db: Session = Depends(get_db)
+):
+    active_rentals = db.query(Rental).filter(Rental.status == RentalStatus.ACTIVE).all()
+    opportunities = []
+    for r in active_rentals:
+        if r.equipment:
+            op = evaluate_early_return_opportunity(r, r.equipment, db)
+            if op:
+                op["rental_id"] = r.id
+                opportunities.append(op)
+
+    return {
+        "opportunities": opportunities,
+        "total": len(opportunities),
+        "dataset_label": "AI RENTAL UTILIZATION & EARLY RETURN INTELLIGENCE",
+        "safety_note": "Recommendations are decision-support only. No records are modified automatically."
+    }
+
 @router.get("/recommendations")
 def get_recommendations(
     current_user: User = Depends(manager_only),

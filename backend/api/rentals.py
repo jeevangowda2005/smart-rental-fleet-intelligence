@@ -46,7 +46,76 @@ def process_overdue_rentals(db: Session):
                 db.add(alert)
     db.commit()
 
-def format_rental_response(r: Rental) -> RentalResponse:
+from backend.services.rental_intelligence import (
+    calculate_rental_progress,
+    evaluate_early_return_opportunity,
+    simulate_early_return
+)
+from backend.services.fleet_intelligence import compute_equipment_health
+
+def format_rental_response(r: Rental, db: Optional[Session] = None) -> RentalResponse:
+    eq = r.equipment
+    prog = calculate_rental_progress(r, eq)
+
+    # Health & alerts info
+    active_alerts = [a for a in (eq.alerts if eq else []) if not a.is_resolved]
+    health_info = compute_equipment_health(eq, active_alerts, []) if eq else {"status": "HEALTHY", "health_score": 100.0}
+
+    # Early return opportunity check
+    early_return_op = evaluate_early_return_opportunity(r, eq, db) if (db and eq) else None
+
+    # Lifecycle stages construction
+    eq_code = eq.equipment_id if eq else f"EQ-{r.equipment_id}"
+    eq_model = eq.model if eq else ""
+    eq_cat = eq.equipment_type if eq else ""
+    op_name = r.operator.name if r.operator else "Unassigned"
+    s_name = r.site.site_name if r.site else "Site Location"
+
+    lifecycle = [
+        {
+            "stage": "CHECKED OUT",
+            "timestamp": r.checkout_time.isoformat(),
+            "title": "Equipment Checked Out",
+            "details": f"{eq_code} ({eq_model}) dispatched to {s_name} assigned to {op_name}."
+        },
+        {
+            "stage": "CURRENT USAGE",
+            "timestamp": r.checkout_time.isoformat(),
+            "title": "Shift Telematics Metering",
+            "details": f"Recorded Engine Meter: {prog['engine_hours']} hrs | Operating: {prog['operating_hours']} hrs | Idle: {prog['idle_hours']} hrs."
+        },
+        {
+            "stage": "CURRENT TELEMETRY",
+            "timestamp": datetime.utcnow().isoformat(),
+            "title": "Live Machine Health",
+            "details": f"Health Score: {health_info['health_score']}/100 ({health_info['status']}) | Active Alerts: {len(active_alerts)} | Fuel: {prog['fuel_usage']} L/hr."
+        },
+        {
+            "stage": "RENTAL PROGRESS",
+            "timestamp": datetime.utcnow().isoformat(),
+            "title": "Contract Time & Utilization Progress",
+            "details": f"Planned: {prog['planned_duration_days']}d | Elapsed: {prog['elapsed_duration_days']}d | Remaining: {prog['remaining_duration_days']}d | Utilization: {prog['utilization_pct']}%."
+        },
+        {
+            "stage": "AI INSIGHTS",
+            "timestamp": datetime.utcnow().isoformat(),
+            "title": "AI Fleet Intelligence Analysis",
+            "details": early_return_op["evidence_summary"] if early_return_op else "Machine telemetry indicates normal operational utilization. No early-return opportunity detected."
+        },
+        {
+            "stage": "EXPECTED RETURN",
+            "timestamp": r.expected_return_time.isoformat(),
+            "title": "Contract Expected Return Schedule",
+            "details": f"Expected return date: {r.expected_return_time.strftime('%b %d, %Y %H:%M UTC')}."
+        },
+        {
+            "stage": "CHECK-IN",
+            "timestamp": r.actual_return_time.isoformat() if r.actual_return_time else None,
+            "title": "Depot Return & Release",
+            "details": f"Returned and released to AVAILABLE depot inventory on {r.actual_return_time.strftime('%b %d, %Y %H:%M UTC')}" if r.actual_return_time else "Contract active - machine in field operation."
+        }
+    ]
+
     return RentalResponse(
         id=r.id,
         equipment_id=r.equipment_id,
@@ -56,10 +125,28 @@ def format_rental_response(r: Rental) -> RentalResponse:
         expected_return_time=r.expected_return_time,
         actual_return_time=r.actual_return_time,
         status=r.status,
-        equipment_code=r.equipment.equipment_id if r.equipment else f"EQ-{r.equipment_id}",
-        equipment_model=r.equipment.model if r.equipment else "",
-        operator_name=r.operator.name if r.operator else "Unassigned",
-        site_name=r.site.site_name if r.site else "Site Location"
+        equipment_code=eq_code,
+        equipment_model=eq_model,
+        equipment_category=eq_cat,
+        operator_name=op_name,
+        site_name=s_name,
+        planned_duration_days=prog["planned_duration_days"],
+        elapsed_duration_days=prog["elapsed_duration_days"],
+        remaining_duration_days=prog["remaining_duration_days"],
+        planned_duration_hours=prog["planned_duration_hours"],
+        elapsed_duration_hours=prog["elapsed_duration_hours"],
+        remaining_duration_hours=prog["remaining_duration_hours"],
+        progress_pct=prog["progress_pct"],
+        utilization=prog["utilization_pct"],
+        engine_hours=prog["engine_hours"],
+        operating_hours=prog["operating_hours"],
+        idle_hours=prog["idle_hours"],
+        fuel_usage=prog["fuel_usage"],
+        health_status=health_info["status"],
+        health_score=health_info["health_score"],
+        active_alerts_count=len(active_alerts),
+        early_return_opportunity=early_return_op,
+        lifecycle_stages=lifecycle
     )
 
 @router.get("", response_model=List[RentalResponse])
@@ -78,7 +165,7 @@ def list_rentals(
         query = query.filter(Rental.status == status)
     
     rentals = query.order_by(Rental.checkout_time.desc()).all()
-    return [format_rental_response(r) for r in rentals]
+    return [format_rental_response(r, db) for r in rentals]
 
 @router.get("/my-active", response_model=Optional[RentalResponse])
 def get_operator_active_rental(
@@ -92,7 +179,34 @@ def get_operator_active_rental(
     ).first()
     if not rental:
         return None
-    return format_rental_response(rental)
+    return format_rental_response(rental, db)
+
+@router.get("/{rental_id}", response_model=RentalResponse)
+def get_rental_by_id(
+    rental_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental contract not found")
+    if current_user.role == UserRole.OPERATOR and rental.operator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this rental contract")
+    return format_rental_response(rental, db)
+
+@router.post("/{rental_id}/what-if-early-return")
+def run_early_return_what_if(
+    rental_id: int,
+    current_user: User = Depends(require_role([UserRole.MANAGER])),
+    db: Session = Depends(get_db)
+):
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental contract not found")
+    if not rental.equipment:
+        raise HTTPException(status_code=400, detail="Associated equipment asset not found")
+    
+    return simulate_early_return(rental, rental.equipment, db)
 
 @router.post("/checkout", response_model=RentalResponse)
 def checkout_equipment(
@@ -138,7 +252,7 @@ def checkout_equipment(
 
     db.commit()
     db.refresh(rental)
-    return format_rental_response(rental)
+    return format_rental_response(rental, db)
 
 @router.post("/{rental_id}/checkin", response_model=RentalResponse)
 def checkin_equipment(
@@ -163,7 +277,7 @@ def checkin_equipment(
 
     db.commit()
     db.refresh(rental)
-    return format_rental_response(rental)
+    return format_rental_response(rental, db)
 
 @router.post("/checkin-by-equipment/{id_or_code}", response_model=RentalResponse)
 def checkin_equipment_by_code(
@@ -211,5 +325,5 @@ def checkin_equipment_by_code(
 
     db.commit()
     db.refresh(rental)
-    return format_rental_response(rental)
+    return format_rental_response(rental, db)
 
