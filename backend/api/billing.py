@@ -120,20 +120,14 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
 
     # Physical Data Consistency Invariant:
     # Operating + Idle hours accrued during a rental cannot physically exceed elapsed wall-clock rental duration (actual_hours).
-    # If telemetry updates (e.g. accelerated test script inputs or simulator ticks) advance faster than wall-clock duration, clamp accrued usage to actual_hours.
-    if actual_hours > 0 and raw_eng_delta > actual_hours:
-        scale = actual_hours / raw_eng_delta if raw_eng_delta > 0 else 1.0
-        rental_eng_delta = actual_hours
-        rental_idle_hours = round(raw_idle_delta * scale, 3)
-    else:
-        rental_eng_delta = round(raw_eng_delta, 3)
-        rental_idle_hours = round(raw_idle_delta, 3)
+    # If telemetry updates (e.g. shift logs) record operating/idle usage, actual_duration_hours is at least equal to total usage.
+    raw_tot_usage = round(raw_eng_delta, 3)
+    if raw_tot_usage > actual_hours:
+        actual_hours = raw_tot_usage
 
+    rental_eng_delta = round(raw_eng_delta, 3)
+    rental_idle_hours = round(raw_idle_delta, 3)
     rental_operating_hours = round(max(0.0, rental_eng_delta - rental_idle_hours), 3)
-
-    # Secondary safety guard: operating + idle <= actual_hours
-    if actual_hours > 0 and (rental_operating_hours + rental_idle_hours) > actual_hours:
-        rental_operating_hours = round(max(0.0, actual_hours - rental_idle_hours), 3)
 
     # Fuel calculation based on corrected rental operating hours
     rental_fuel_delta = max(0.0, checkin_fuel - checkout_fuel)
