@@ -69,10 +69,10 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
 
     # Wall-clock duration calculations
     planned_seconds = max(0.0, (rental.expected_return_time - checkout_time).total_seconds())
-    planned_hours = round(planned_seconds / 3600.0, 2)
+    planned_hours = round(planned_seconds / 3600.0, 3)
 
     actual_seconds = max(0.0, (checkin_time - checkout_time).total_seconds())
-    actual_hours = round(actual_seconds / 3600.0, 2)
+    actual_hours = round(actual_seconds / 3600.0, 3)
 
     # Cumulative baseline at check-in (defaults to current equipment meters)
     checkin_eng = rental.engine_hours_at_checkin if (rental.engine_hours_at_checkin is not None and rental.engine_hours_at_checkin > 0) else (eq.engine_hours if eq else 0.0)
@@ -124,16 +124,16 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
     if actual_hours > 0 and raw_eng_delta > actual_hours:
         scale = actual_hours / raw_eng_delta if raw_eng_delta > 0 else 1.0
         rental_eng_delta = actual_hours
-        rental_idle_hours = round(raw_idle_delta * scale, 2)
+        rental_idle_hours = round(raw_idle_delta * scale, 3)
     else:
-        rental_eng_delta = round(raw_eng_delta, 2)
-        rental_idle_hours = round(raw_idle_delta, 2)
+        rental_eng_delta = round(raw_eng_delta, 3)
+        rental_idle_hours = round(raw_idle_delta, 3)
 
-    rental_operating_hours = round(max(0.0, rental_eng_delta - rental_idle_hours), 2)
+    rental_operating_hours = round(max(0.0, rental_eng_delta - rental_idle_hours), 3)
 
     # Secondary safety guard: operating + idle <= actual_hours
     if actual_hours > 0 and (rental_operating_hours + rental_idle_hours) > actual_hours:
-        rental_operating_hours = round(max(0.0, actual_hours - rental_idle_hours), 2)
+        rental_operating_hours = round(max(0.0, actual_hours - rental_idle_hours), 3)
 
     # Fuel calculation based on corrected rental operating hours
     rental_fuel_delta = max(0.0, checkin_fuel - checkout_fuel)
@@ -161,7 +161,7 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
     assert rental_fuel_used >= 0.0, "Fuel used cannot be negative"
     assert actual_hours >= 0.0, "Actual duration hours cannot be negative"
     if actual_hours > 0:
-        assert round(rental_operating_hours + rental_idle_hours, 2) <= round(actual_hours + 0.01, 2), (
+        assert round(rental_operating_hours + rental_idle_hours, 3) <= round(actual_hours + 0.001, 3), (
             f"Physical Data Inconsistency: Operating ({rental_operating_hours}) + Idle ({rental_idle_hours}) "
             f"= {rental_operating_hours + rental_idle_hours} hrs, which exceeds actual rental duration ({actual_hours} hrs)"
         )
