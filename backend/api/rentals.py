@@ -303,7 +303,9 @@ def checkin_equipment_by_code(
     if id_or_code.isdigit():
         eq = db.query(Equipment).filter(Equipment.id == int(id_or_code)).first()
     else:
-        eq = db.query(Equipment).filter(Equipment.equipment_id == id_or_code).first()
+        eq = db.query(Equipment).filter(
+            (Equipment.equipment_id == id_or_code) | (Equipment.qr_code == id_or_code)
+        ).first()
 
     if not eq:
         raise HTTPException(status_code=404, detail="Equipment asset not found")

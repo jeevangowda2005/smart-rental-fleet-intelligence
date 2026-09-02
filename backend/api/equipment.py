@@ -95,7 +95,9 @@ def get_equipment_full_details(
     if id_or_code.isdigit():
         item = db.query(Equipment).filter(Equipment.id == int(id_or_code)).first()
     else:
-        item = db.query(Equipment).filter(Equipment.equipment_id == id_or_code).first()
+        item = db.query(Equipment).filter(
+            (Equipment.equipment_id == id_or_code) | (Equipment.qr_code == id_or_code)
+        ).first()
 
     if not item:
         raise HTTPException(status_code=404, detail="Equipment asset not found")
@@ -184,7 +186,9 @@ def get_equipment_detail_single(
     if id_or_code.isdigit():
         item = db.query(Equipment).filter(Equipment.id == int(id_or_code)).first()
     else:
-        item = db.query(Equipment).filter(Equipment.equipment_id == id_or_code).first()
+        item = db.query(Equipment).filter(
+            (Equipment.equipment_id == id_or_code) | (Equipment.qr_code == id_or_code)
+        ).first()
 
     if not item:
         raise HTTPException(status_code=404, detail="Equipment asset not found")
