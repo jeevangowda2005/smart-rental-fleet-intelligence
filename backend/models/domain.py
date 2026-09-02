@@ -108,6 +108,16 @@ class Rental(Base):
     actual_return_time = Column(DateTime, nullable=True)
     status = Column(SQLEnum(RentalStatus), default=RentalStatus.ACTIVE, index=True, nullable=False)
 
+    # Telemetry baseline at checkout
+    engine_hours_at_checkout = Column(Float, nullable=True, default=0.0)
+    idle_hours_at_checkout = Column(Float, nullable=True, default=0.0)
+    fuel_usage_at_checkout = Column(Float, nullable=True, default=0.0)
+
+    # Telemetry snapshot at checkin
+    engine_hours_at_checkin = Column(Float, nullable=True, default=0.0)
+    idle_hours_at_checkin = Column(Float, nullable=True, default=0.0)
+    fuel_usage_at_checkin = Column(Float, nullable=True, default=0.0)
+
     # Relationships
     equipment = relationship("Equipment", back_populates="rentals")
     operator = relationship("User", back_populates="rentals")
@@ -296,10 +306,20 @@ class Billing(Base):
     operator_email = Column(String, nullable=True)
     site_name = Column(String, nullable=True)
 
-    # Telemetry snapshot at check-in
+    # Telemetry snapshot at checkout (baseline reference)
+    engine_hours_at_checkout = Column(Float, default=0.0)
+    idle_hours_at_checkout = Column(Float, default=0.0)
+    fuel_usage_at_checkout = Column(Float, default=0.0)
+
+    # Telemetry snapshot at check-in (cumulative reference)
     engine_hours_at_checkin = Column(Float, default=0.0)
     idle_hours_at_checkin = Column(Float, default=0.0)
     fuel_usage_at_checkin = Column(Float, default=0.0)
+
+    # Rental-specific usage (calculated: checkin - checkout)
+    rental_operating_hours = Column(Float, default=0.0)
+    rental_idle_hours = Column(Float, default=0.0)
+    rental_fuel_used = Column(Float, default=0.0)
 
     generated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 

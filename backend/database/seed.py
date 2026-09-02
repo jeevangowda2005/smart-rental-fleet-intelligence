@@ -207,6 +207,9 @@ def _seed_rentals(db: Session):
             checkout_time=now - datetime.timedelta(days=5),
             expected_return_time=now + datetime.timedelta(days=9),
             status=RentalStatus.ACTIVE,
+            engine_hours_at_checkout=max(0.0, eq1.engine_hours - 25.0),
+            idle_hours_at_checkout=max(0.0, eq1.idle_hours - 4.0),
+            fuel_usage_at_checkout=eq1.fuel_usage,
         ),
         Rental(
             equipment_id=eq5.id,
@@ -215,6 +218,9 @@ def _seed_rentals(db: Session):
             checkout_time=now - datetime.timedelta(days=12),
             expected_return_time=now - datetime.timedelta(days=2),
             status=RentalStatus.OVERDUE,
+            engine_hours_at_checkout=max(0.0, eq5.engine_hours - 60.0),
+            idle_hours_at_checkout=max(0.0, eq5.idle_hours - 8.0),
+            fuel_usage_at_checkout=eq5.fuel_usage,
         ),
         Rental(
             equipment_id=eq6.id,
@@ -223,6 +229,9 @@ def _seed_rentals(db: Session):
             checkout_time=now - datetime.timedelta(days=3),
             expected_return_time=now + datetime.timedelta(days=11),
             status=RentalStatus.ACTIVE,
+            engine_hours_at_checkout=max(0.0, eq6.engine_hours - 15.0),
+            idle_hours_at_checkout=max(0.0, eq6.idle_hours - 2.0),
+            fuel_usage_at_checkout=eq6.fuel_usage,
         ),
     ]
     db.add_all(rentals)

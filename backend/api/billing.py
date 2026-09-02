@@ -40,13 +40,22 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
     Calculate billing for a completed rental and persist it.
     Idempotent: if a billing record already exists for this rental, return it unchanged.
 
-    Pricing uses the project's centralized cost_config rates:
-      - Rental charge: actual operating hours × DEFAULT_OPERATING_COST_PER_HOUR
-      - Fuel charge: fuel_usage (L/hr) × actual_hours × DEFAULT_FUEL_COST_PER_LITER
-      - Idle charge: idle_hours × DEFAULT_IDLE_COST_PER_HOUR
-      - Tax: 18% GST on subtotal
+    CRITICAL RULES & CONCEPTUAL SEPARATION:
+      1. Cumulative Engine Meter: Machine's lifetime meter (e.g. 680.44 hrs). Saved as reference only.
+      2. Rental-Specific Usage: Usage accrued BETWEEN checkout and check-in times.
+         - rental_operating_hours = checkin_operating - checkout_operating (or checkin_engine - checkout_engine - rental_idle)
+         - rental_idle_hours = checkin_idle - checkout_idle
+         - rental_fuel_used = checkin_fuel - checkout_fuel (or burn_rate × rental_operating_hours)
+      3. Rental Duration: Wall-clock elapsed hours between checkout_time and actual_checkin_time.
+
+    Charges calculated strictly from rental-specific usage:
+      - Operating Charge = rental_operating_hours × DEFAULT_OPERATING_COST_PER_HOUR (₹1,200/hr)
+      - Standby / Idle Charge = rental_idle_hours × DEFAULT_IDLE_COST_PER_HOUR (₹500/hr)
+      - Fuel Charge = rental_fuel_used × DEFAULT_FUEL_COST_PER_LITER (₹95/L)
+      - Subtotal = operating_charge + idle_charge + fuel_charge + additional_charge
+      - Tax = subtotal × 18% GST
+      - Total = subtotal + Tax
     """
-    # Idempotency check — never create a duplicate invoice
     existing = db.query(Billing).filter(Billing.rental_id == rental.id).first()
     if existing:
         return existing
@@ -58,34 +67,68 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
     checkin_time = rental.actual_return_time or datetime.datetime.utcnow()
     checkout_time = rental.checkout_time
 
-    # Duration calculations
+    # Wall-clock duration calculations
     planned_seconds = max(0.0, (rental.expected_return_time - checkout_time).total_seconds())
     planned_hours = round(planned_seconds / 3600.0, 2)
 
     actual_seconds = max(0.0, (checkin_time - checkout_time).total_seconds())
     actual_hours = round(actual_seconds / 3600.0, 2)
 
-    # Telemetry snapshot values
-    engine_hours = eq.engine_hours if eq else 0.0
-    idle_hours = eq.idle_hours if eq else 0.0
-    fuel_usage_rate = eq.fuel_usage if eq else 0.0  # L/hr
+    # Cumulative baseline at check-in (defaults to current equipment meters)
+    checkin_eng = rental.engine_hours_at_checkin if (rental.engine_hours_at_checkin is not None and rental.engine_hours_at_checkin > 0) else (eq.engine_hours if eq else 0.0)
+    checkin_idle = rental.idle_hours_at_checkin if (rental.idle_hours_at_checkin is not None and rental.idle_hours_at_checkin > 0) else (eq.idle_hours if eq else 0.0)
+    checkin_fuel = rental.fuel_usage_at_checkin if (rental.fuel_usage_at_checkin is not None and rental.fuel_usage_at_checkin > 0) else (eq.fuel_usage if eq else 0.0)
 
-    # Operating hours = engine hours minus idle hours (clamped to 0)
-    operating_hours = max(0.0, engine_hours - idle_hours)
+    # Baseline at checkout
+    checkout_eng = rental.engine_hours_at_checkout if (rental.engine_hours_at_checkout is not None and rental.engine_hours_at_checkout > 0) else 0.0
+    checkout_idle = rental.idle_hours_at_checkout if (rental.idle_hours_at_checkout is not None and rental.idle_hours_at_checkout > 0) else 0.0
+    checkout_fuel = rental.fuel_usage_at_checkout if (rental.fuel_usage_at_checkout is not None and rental.fuel_usage_at_checkout > 0) else 0.0
 
-    # Charge calculations using centralized cost_config rates
-    rental_charge = round(operating_hours * DEFAULT_OPERATING_COST_PER_HOUR, 2)
+    # Fallback for old/seeded rentals created before baseline capture was added:
+    if checkout_eng == 0.0 and checkin_eng > 0.0:
+        from backend.models.domain import UsageLog
+        earliest_log = db.query(UsageLog).filter(
+            UsageLog.equipment_id == rental.equipment_id,
+            UsageLog.timestamp >= checkout_time
+        ).order_by(UsageLog.timestamp.asc()).first()
 
-    # Fuel charge: fuel burn rate × actual rental hours × cost per liter
-    fuel_charge = round(fuel_usage_rate * actual_hours * DEFAULT_FUEL_COST_PER_LITER, 2)
+        if earliest_log and earliest_log.engine_hours > 0:
+            checkout_eng = earliest_log.engine_hours
+            checkout_idle = earliest_log.idle_hours
+        else:
+            # If no checkout baseline exists, set baseline = checkin so lifetime meter (680.44 hrs) is NEVER billed as rental usage
+            checkout_eng = checkin_eng
+            checkout_idle = checkin_idle
+            checkout_fuel = checkin_fuel
 
-    # Idle charge
-    idle_charge = round(idle_hours * DEFAULT_IDLE_COST_PER_HOUR, 2)
+    # Calculate rental-specific usage accrued BETWEEN checkout and checkin
+    rental_engine_delta = max(0.0, checkin_eng - checkout_eng)
+    rental_idle_hours = round(max(0.0, checkin_idle - checkout_idle), 2)
+    rental_operating_hours = round(max(0.0, rental_engine_delta - rental_idle_hours), 2)
 
+    # Fuel usage during rental
+    rental_fuel_delta = max(0.0, checkin_fuel - checkout_fuel)
+    if rental_fuel_delta > 0:
+        rental_fuel_used = round(rental_fuel_delta, 2)
+    else:
+        burn_rate = checkin_fuel if checkin_fuel > 0 else 20.0
+        rental_fuel_used = round(burn_rate * rental_operating_hours, 2)
+
+    # Charge calculations from rental-specific usage
+    rental_charge = round(rental_operating_hours * DEFAULT_OPERATING_COST_PER_HOUR, 2)
+    idle_charge = round(rental_idle_hours * DEFAULT_IDLE_COST_PER_HOUR, 2)
+    fuel_charge = round(rental_fuel_used * DEFAULT_FUEL_COST_PER_LITER, 2)
     additional_charge = 0.0
+
     subtotal = round(rental_charge + fuel_charge + idle_charge + additional_charge, 2)
     tax_amount = round(subtotal * TAX_RATE, 2)
     total_amount = round(subtotal + tax_amount, 2)
+
+    # Mandatory consistency assertions
+    assert rental_operating_hours >= 0.0, "Operating hours cannot be negative"
+    assert rental_idle_hours >= 0.0, "Idle hours cannot be negative"
+    assert rental_fuel_used >= 0.0, "Fuel used cannot be negative"
+    assert actual_hours >= 0.0, "Actual duration hours cannot be negative"
 
     billing = Billing(
         rental_id=rental.id,
@@ -107,17 +150,24 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
         tax_rate=TAX_RATE,
         tax_amount=tax_amount,
         total_amount=total_amount,
-        # Snapshot fields
+        # Snapshot metadata
         equipment_code=eq.equipment_id if eq else None,
         equipment_model=eq.model if eq else None,
         equipment_type=eq.equipment_type if eq else None,
         operator_name=op.name if op else None,
         operator_email=op.email if op else None,
         site_name=site.site_name if site else None,
-        # Telemetry snapshot
-        engine_hours_at_checkin=engine_hours,
-        idle_hours_at_checkin=idle_hours,
-        fuel_usage_at_checkin=fuel_usage_rate,
+        # Telemetry baselines & snapshots
+        engine_hours_at_checkout=checkout_eng,
+        idle_hours_at_checkout=checkout_idle,
+        fuel_usage_at_checkout=checkout_fuel,
+        engine_hours_at_checkin=checkin_eng,
+        idle_hours_at_checkin=checkin_idle,
+        fuel_usage_at_checkin=checkin_fuel,
+        # Rental-specific usage
+        rental_operating_hours=rental_operating_hours,
+        rental_idle_hours=rental_idle_hours,
+        rental_fuel_used=rental_fuel_used,
         generated_at=datetime.datetime.utcnow(),
     )
     db.add(billing)

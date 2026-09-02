@@ -254,6 +254,93 @@ def test_rental_checkout_checkin_and_billing_lifecycle():
     db.close()
 
 
+def test_rental_specific_billing_calculation():
+    """
+    TEST: Cumulative engine meter MUST NOT equal rental operating hours.
+    Checkout engine meter: 680.00, idle: 120.0
+    Check-in engine meter: 680.44, idle: 122.0
+    Expected rental operating hours: 0.44 - 2.0 = 0.0 (clamped) or 0.44 if engine meter ticked by 2.44
+    Let's test Checkout 680.00 (idle 120.0) -> Check-in 682.44 (idle 122.0)
+    => rental engine delta = 2.44
+    => rental idle = 2.00
+    => rental operating hours = 0.44 hrs
+    Billed operating = 0.44 * 1200 = 528.00
+    Billed idle = 2.0 * 500 = 1000.00
+    Subtotal = 1528.00 (plus fuel)
+    Subtotal & Tax MUST be internally consistent!
+    """
+    email = "usera_billing_calc@catfleet.com"
+
+    client.post("/api/auth/register", json={"name": "Operator Calc", "email": email, "password": "Password123"})
+    login_data = client.post("/api/auth/login", json={"email": email, "password": "Password123"}).json()
+    token = login_data["access_token"]
+    user_id = login_data["user"]["id"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    db = BillingTestSessionLocal()
+    eq = db.query(Equipment).filter(Equipment.equipment_id == "CAT-CMP-825").first()
+    site = db.query(Site).first()
+    # Set known initial baseline on equipment
+    eq.engine_hours = 680.00
+    eq.idle_hours = 120.00
+    eq.fuel_usage = 29.0
+    db.commit()
+
+    eq_id = eq.id
+    site_id = site.id
+    db.close()
+
+    # 1. Checkout captures baseline 680.00 engine, 120.00 idle
+    co_resp = client.post("/api/rentals/checkout", headers=headers, json={
+        "equipment_id": eq_id,
+        "site_id": site_id,
+        "operator_id": user_id,
+        "expected_return_days": 3,
+    })
+    assert co_resp.status_code == 200, co_resp.text
+    rental_id = co_resp.json()["id"]
+
+    # 2. Simulate machine usage during rental:
+    # Engine meter ticks from 680.00 to 682.44 (+2.44 engine hrs)
+    # Idle meter ticks from 120.00 to 122.00 (+2.00 idle hrs)
+    db = BillingTestSessionLocal()
+    eq_in_use = db.query(Equipment).filter(Equipment.id == eq_id).first()
+    eq_in_use.engine_hours = 682.44
+    eq_in_use.idle_hours = 122.00
+    db.commit()
+    db.close()
+
+    # 3. Check-in
+    ci_resp = client.post(f"/api/rentals/{rental_id}/checkin", headers=headers, json={"rental_id": rental_id})
+    assert ci_resp.status_code == 200, ci_resp.text
+
+    # 4. Fetch invoice
+    bill_resp = client.get(f"/api/billing/rental/{rental_id}", headers=headers)
+    assert bill_resp.status_code == 200, bill_resp.text
+    bill = bill_resp.json()
+
+    # VERIFY CRITICAL REQUIREMENTS
+    # Cumulative machine lifetime meter MUST NOT be billed as rental operating hours!
+    assert bill["engine_hours_at_checkin"] == 682.44, "Lifetime engine meter reference preserved"
+    assert bill["rental_operating_hours"] == 0.44, f"Expected 0.44 operating hrs, got {bill['rental_operating_hours']}"
+    assert bill["rental_idle_hours"] == 2.0, f"Expected 2.0 idle hrs, got {bill['rental_idle_hours']}"
+
+    # Verify line item charges
+    expected_op_charge = round(0.44 * 1200.0, 2)  # 528.0
+    expected_idle_charge = round(2.0 * 500.0, 2)  # 1000.0
+    assert bill["rental_charge"] == expected_op_charge, f"Operating charge {bill['rental_charge']} != {expected_op_charge}"
+    assert bill["idle_charge"] == expected_idle_charge, f"Idle charge {bill['idle_charge']} != {expected_idle_charge}"
+
+    # Verify totals & GST consistency
+    expected_subtotal = round(bill["rental_charge"] + bill["idle_charge"] + bill["fuel_charge"] + bill["additional_charge"], 2)
+    expected_tax = round(expected_subtotal * 0.18, 2)
+    expected_total = round(expected_subtotal + expected_tax, 2)
+
+    assert bill["subtotal"] == expected_subtotal, f"Subtotal mismatch: {bill['subtotal']} != {expected_subtotal}"
+    assert bill["tax_amount"] == expected_tax, f"Tax mismatch: {bill['tax_amount']} != {expected_tax}"
+    assert bill["total_amount"] == expected_total, f"Total mismatch: {bill['total_amount']} != {expected_total}"
+
+
 def test_billing_rbac_user_isolation():
     """
     Verify multi-user billing isolation:

@@ -265,9 +265,18 @@ class BillingResponse(BaseModel):
     site_name: Optional[str] = None
 
     # Telemetry snapshot
+    engine_hours_at_checkout: float = 0.0
+    idle_hours_at_checkout: float = 0.0
+    fuel_usage_at_checkout: float = 0.0
+
     engine_hours_at_checkin: float = 0.0
     idle_hours_at_checkin: float = 0.0
     fuel_usage_at_checkin: float = 0.0
+
+    # Rental-specific usage
+    rental_operating_hours: float = 0.0
+    rental_idle_hours: float = 0.0
+    rental_fuel_used: float = 0.0
 
     generated_at: datetime
 

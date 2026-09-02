@@ -240,8 +240,28 @@ export const BillingPage = () => {
                 <div className="text-slate-200 font-semibold">{selectedBill.site_name || 'Project Site'}</div>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px] uppercase">Rental Duration</span>
-                <div className="text-slate-200">{selectedBill.actual_duration_hours} Operating Hours</div>
+                <span className="text-slate-400 block text-[10px] uppercase">Actual Rental Duration</span>
+                <div className="text-slate-200 font-semibold">{selectedBill.actual_duration_hours} Elapsed Hours</div>
+                <div className="text-[10px] text-slate-400">Planned: {selectedBill.planned_duration_hours} hrs</div>
+              </div>
+            </div>
+
+            {/* Rental Telemetry Summary Box */}
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl grid grid-cols-3 gap-2 text-center text-xs font-mono">
+              <div className="p-2 bg-slate-950/70 rounded-lg">
+                <span className="text-[10px] text-slate-400 block uppercase">Rental Operating Hrs</span>
+                <span className="font-bold text-emerald-400 text-sm">{selectedBill.rental_operating_hours ?? 0} hrs</span>
+              </div>
+              <div className="p-2 bg-slate-950/70 rounded-lg">
+                <span className="text-[10px] text-slate-400 block uppercase">Rental Idle Hrs</span>
+                <span className="font-bold text-amber-400 text-sm">{selectedBill.rental_idle_hours ?? 0} hrs</span>
+              </div>
+              <div className="p-2 bg-slate-950/70 rounded-lg">
+                <span className="text-[10px] text-slate-400 block uppercase">Rental Fuel Used</span>
+                <span className="font-bold text-cyan-400 text-sm">{selectedBill.rental_fuel_used ?? 0} L</span>
+              </div>
+              <div className="col-span-3 text-[10px] text-slate-400 text-left pt-1 px-1">
+                Machine Lifetime Engine Meter: <span className="text-slate-300 font-bold">{selectedBill.engine_hours_at_checkin} hrs</span> (Cumulative Reference)
               </div>
             </div>
 
@@ -255,7 +275,7 @@ export const BillingPage = () => {
                 <div className="px-4 py-3 flex justify-between">
                   <div>
                     <div className="text-white font-semibold">Equipment Operating Charge</div>
-                    <div className="text-[10px] text-slate-400">{selectedBill.engine_hours_at_checkin} engine hrs @ ₹{selectedBill.base_rate_per_hour}/hr</div>
+                    <div className="text-[10px] text-slate-400">{selectedBill.rental_operating_hours ?? 0} rental operating hrs @ ₹{selectedBill.base_rate_per_hour}/hr</div>
                   </div>
                   <span className="text-slate-200 font-bold">₹{selectedBill.rental_charge?.toLocaleString('en-IN')}</span>
                 </div>
@@ -263,7 +283,7 @@ export const BillingPage = () => {
                 <div className="px-4 py-3 flex justify-between">
                   <div>
                     <div className="text-white font-semibold">Fuel Usage Cost</div>
-                    <div className="text-[10px] text-slate-400">Burn rate: {selectedBill.fuel_usage_at_checkin} L/hr @ ₹95/L baseline</div>
+                    <div className="text-[10px] text-slate-400">{selectedBill.rental_fuel_used ?? 0} L consumed @ ₹95/L rate</div>
                   </div>
                   <span className="text-slate-200 font-bold">₹{selectedBill.fuel_charge?.toLocaleString('en-IN')}</span>
                 </div>
@@ -271,7 +291,7 @@ export const BillingPage = () => {
                 <div className="px-4 py-3 flex justify-between">
                   <div>
                     <div className="text-white font-semibold">Engine Standby / Idle Charge</div>
-                    <div className="text-[10px] text-slate-400">{selectedBill.idle_hours_at_checkin} idle hrs @ ₹500/hr idle fee</div>
+                    <div className="text-[10px] text-slate-400">{selectedBill.rental_idle_hours ?? 0} rental idle hrs @ ₹500/hr standby fee</div>
                   </div>
                   <span className="text-slate-200 font-bold">₹{selectedBill.idle_charge?.toLocaleString('en-IN')}</span>
                 </div>

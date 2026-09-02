@@ -241,7 +241,10 @@ def checkout_equipment(
         site_id=request.site_id,
         checkout_time=checkout_now,
         expected_return_time=expected_return,
-        status=RentalStatus.ACTIVE
+        status=RentalStatus.ACTIVE,
+        engine_hours_at_checkout=equipment.engine_hours or 0.0,
+        idle_hours_at_checkout=equipment.idle_hours or 0.0,
+        fuel_usage_at_checkout=equipment.fuel_usage or 0.0,
     )
     db.add(rental)
 
@@ -272,6 +275,9 @@ def checkin_equipment(
     rental.status = RentalStatus.COMPLETED
 
     if rental.equipment:
+        rental.engine_hours_at_checkin = rental.equipment.engine_hours or 0.0
+        rental.idle_hours_at_checkin = rental.equipment.idle_hours or 0.0
+        rental.fuel_usage_at_checkin = rental.equipment.fuel_usage or 0.0
         rental.equipment.status = EquipmentStatus.AVAILABLE
         rental.equipment.operator_id = None
 
@@ -318,6 +324,9 @@ def checkin_equipment_by_code(
 
     rental.actual_return_time = datetime.utcnow()
     rental.status = RentalStatus.COMPLETED
+    rental.engine_hours_at_checkin = eq.engine_hours or 0.0
+    rental.idle_hours_at_checkin = eq.idle_hours or 0.0
+    rental.fuel_usage_at_checkin = eq.fuel_usage or 0.0
 
     eq.status = EquipmentStatus.AVAILABLE
     eq.operator_id = None
