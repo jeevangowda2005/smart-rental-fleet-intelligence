@@ -24,26 +24,26 @@ from sqlalchemy import text
 def ensure_schema_migrations():
     """Ensure newly added columns exist on pre-existing PostgreSQL/SQLite tables."""
     statements = [
-        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS engine_hours_at_checkout FLOAT DEFAULT 0.0;",
-        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS idle_hours_at_checkout FLOAT DEFAULT 0.0;",
-        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS fuel_usage_at_checkout FLOAT DEFAULT 0.0;",
-        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS engine_hours_at_checkin FLOAT DEFAULT 0.0;",
-        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS idle_hours_at_checkin FLOAT DEFAULT 0.0;",
-        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS fuel_usage_at_checkin FLOAT DEFAULT 0.0;",
-        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS engine_hours_at_checkout FLOAT DEFAULT 0.0;",
-        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS idle_hours_at_checkout FLOAT DEFAULT 0.0;",
-        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS fuel_usage_at_checkout FLOAT DEFAULT 0.0;",
-        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_operating_hours FLOAT DEFAULT 0.0;",
-        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_idle_hours FLOAT DEFAULT 0.0;",
-        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_fuel_used FLOAT DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS engine_hours_at_checkout DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS idle_hours_at_checkout DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS fuel_usage_at_checkout DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS engine_hours_at_checkin DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS idle_hours_at_checkin DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE rentals ADD COLUMN IF NOT EXISTS fuel_usage_at_checkin DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS engine_hours_at_checkout DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS idle_hours_at_checkout DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS fuel_usage_at_checkout DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_operating_hours DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_idle_hours DOUBLE PRECISION DEFAULT 0.0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS rental_fuel_used DOUBLE PRECISION DEFAULT 0.0;",
     ]
     try:
         with engine.begin() as conn:
             for stmt in statements:
                 try:
                     conn.execute(text(stmt))
-                except Exception:
-                    pass
+                except Exception as ex:
+                    print(f"Migration statement notice: {ex}")
     except Exception as e:
         print(f"Schema migration notice: {e}")
 
