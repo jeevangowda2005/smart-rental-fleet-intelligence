@@ -34,7 +34,7 @@ export const ExecutivePage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sumRes, costsRes, idleRes, fuelRes, risksRes, oppsRes, cfgRes, eqRes, siteRes] = await Promise.all([
+      const results = await Promise.allSettled([
         businessService.getExecutiveSummary(),
         businessService.getAssetCosts(),
         businessService.getIdleImpact(),
@@ -46,15 +46,15 @@ export const ExecutivePage = () => {
         siteService.getSites()
       ]);
 
-      setSummary(sumRes);
-      setCostsData(costsRes);
-      setIdleData(idleRes);
-      setFuelData(fuelRes);
-      setRisksData(risksRes);
-      setOppsData(oppsRes);
-      setConfig(cfgRes);
-      setEquipmentList(eqRes);
-      setSitesList(siteRes);
+      if (results[0].status === 'fulfilled') setSummary(results[0].value);
+      if (results[1].status === 'fulfilled') setCostsData(results[1].value);
+      if (results[2].status === 'fulfilled') setIdleData(results[2].value);
+      if (results[3].status === 'fulfilled') setFuelData(results[3].value);
+      if (results[4].status === 'fulfilled') setRisksData(results[4].value);
+      if (results[5].status === 'fulfilled') setOppsData(results[5].value);
+      if (results[6].status === 'fulfilled') setConfig(results[6].value);
+      if (results[7].status === 'fulfilled') setEquipmentList(results[7].value);
+      if (results[8].status === 'fulfilled') setSitesList(results[8].value);
     } catch (e) {
       console.error(e);
       addToast('Error loading executive intelligence data', 'error');
@@ -109,23 +109,32 @@ export const ExecutivePage = () => {
           </div>
         </div>
 
-        {/* Executive KPI Cards */}
-        <ExecutiveKpiCards summary={summary} />
+        {loading && !summary ? (
+          <div className="p-12 text-center bg-slate-900 border border-industrial-border rounded-2xl shadow-xl">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-cat-500 border-t-transparent mb-3"></div>
+            <p className="text-xs font-mono text-slate-300 font-bold uppercase tracking-wider">Loading Executive Fleet Intelligence Data...</p>
+          </div>
+        ) : (
+          <>
+            {/* Executive KPI Cards */}
+            <ExecutiveKpiCards summary={summary} />
 
-        {/* Top Optimization Opportunities */}
-        <OptimizationOpportunityPanel
-          opportunities={oppsData ? oppsData.opportunities : []}
-          onSelectWhatIf={handleSelectWhatIf}
-        />
+            {/* Top Optimization Opportunities */}
+            <OptimizationOpportunityPanel
+              opportunities={oppsData ? oppsData.opportunities : []}
+              onSelectWhatIf={handleSelectWhatIf}
+            />
 
-        {/* Fleet Cost & Idle Impact Panel */}
-        <CostImpactPanel costsData={costsData} idleData={idleData} />
+            {/* Fleet Cost & Idle Impact Panel */}
+            <CostImpactPanel costsData={costsData} idleData={idleData} />
 
-        {/* Maintenance Risk & Fuel Efficiency Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <MaintenanceRiskPanel risksData={risksData} />
-          <FuelEfficiencyPanel fuelData={fuelData} />
-        </div>
+            {/* Maintenance Risk & Fuel Efficiency Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <MaintenanceRiskPanel risksData={risksData} />
+              <FuelEfficiencyPanel fuelData={fuelData} />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Assumptions Modal */}
@@ -139,8 +148,8 @@ export const ExecutivePage = () => {
       <WhatIfModal
         isOpen={whatIfOpen}
         onClose={() => setWhatIfOpen(false)}
-        equipmentList={equipmentList}
-        sitesList={sitesList}
+        recommendation={selectedOpp}
+        sites={sitesList}
       />
     </MainLayout>
   );

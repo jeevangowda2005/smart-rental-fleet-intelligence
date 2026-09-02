@@ -19,17 +19,30 @@ const VerdictBadge = ({ verdict }) => {
   );
 };
 
-export const WhatIfModal = ({ recommendation, sites, onClose }) => {
+export const WhatIfModal = ({ recommendation, sites, sitesList, isOpen, onClose }) => {
+  const effectiveSites = sites || sitesList || [];
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [selectedSiteId, setSelectedSiteId] = useState(
-    sites.find(s => s.site_code === recommendation?.destination_site_code)?.id || ''
-  );
+  const [selectedSiteId, setSelectedSiteId] = useState('');
+
+  useEffect(() => {
+    if (recommendation && effectiveSites.length > 0) {
+      const match = effectiveSites.find(s => s.site_code === recommendation.destination_site_code);
+      if (match) {
+        setSelectedSiteId(match.id);
+      } else {
+        const available = effectiveSites.filter(s => s.id !== recommendation.current_site_id);
+        if (available.length > 0) setSelectedSiteId(available[0].id);
+      }
+    }
+  }, [recommendation, effectiveSites]);
 
   const runSimulation = async () => {
+    if (!selectedSiteId || (!recommendation?.equipment_db_id && !recommendation?.id)) return;
+    const eqId = recommendation.equipment_db_id || recommendation.id;
     setLoading(true);
     try {
-      const data = await aiService.runWhatIf(recommendation.equipment_db_id, parseInt(selectedSiteId));
+      const data = await aiService.runWhatIf(eqId, parseInt(selectedSiteId));
       setResult(data);
     } catch (e) {
       console.error(e);
@@ -38,6 +51,7 @@ export const WhatIfModal = ({ recommendation, sites, onClose }) => {
     }
   };
 
+  if (isOpen === false) return null;
   if (!recommendation) return null;
 
   return (
@@ -63,7 +77,7 @@ export const WhatIfModal = ({ recommendation, sites, onClose }) => {
             </div>
             <div className="flex items-center gap-3 mt-3">
               <span className="px-2 py-1 rounded-lg text-xs font-mono bg-slate-700 text-slate-300">
-                {recommendation.current_site_code}
+                {recommendation.current_site_code || 'DEPOT'}
               </span>
               <ArrowRight className="w-4 h-4 text-cat-500" />
               <select
@@ -71,7 +85,7 @@ export const WhatIfModal = ({ recommendation, sites, onClose }) => {
                 onChange={e => setSelectedSiteId(e.target.value)}
                 className="bg-slate-700 border border-slate-600 text-white text-xs font-mono rounded-lg px-2 py-1"
               >
-                {sites.filter(s => s.id !== recommendation.current_site_id).map(s => (
+                {effectiveSites.filter(s => s.id !== recommendation.current_site_id).map(s => (
                   <option key={s.id} value={s.id}>{s.site_code} — {s.site_name}</option>
                 ))}
               </select>
