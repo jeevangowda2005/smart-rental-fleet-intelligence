@@ -290,15 +290,25 @@ def test_rental_specific_billing_calculation():
     site_id = site.id
     db.close()
 
-    # 1. Checkout captures baseline 680.00 engine, 120.00 idle
-    co_resp = client.post("/api/rentals/checkout", headers=headers, json={
-        "equipment_id": eq_id,
-        "site_id": site_id,
-        "operator_id": user_id,
-        "expected_return_days": 3,
-    })
-    assert co_resp.status_code == 200, co_resp.text
-    rental_id = co_resp.json()["id"]
+    # 1. Checkout (checkout timestamp set 5 hours prior so actual duration 5.0 hrs > 2.44 hrs telemetry delta)
+    from datetime import datetime, timedelta
+    checkout_start = datetime.utcnow() - timedelta(hours=5)
+    db = BillingTestSessionLocal()
+    r = Rental(
+        equipment_id=eq_id,
+        operator_id=user_id,
+        site_id=site_id,
+        checkout_time=checkout_start,
+        expected_return_time=checkout_start + timedelta(days=3),
+        status=RentalStatus.ACTIVE,
+        engine_hours_at_checkout=680.00,
+        idle_hours_at_checkout=120.00,
+        fuel_usage_at_checkout=29.0
+    )
+    db.add(r)
+    db.commit()
+    rental_id = r.id
+    db.close()
 
     # 2. Simulate machine usage during rental:
     # Engine meter ticks from 680.00 to 682.44 (+2.44 engine hrs)

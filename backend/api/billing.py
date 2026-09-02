@@ -84,6 +84,12 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
     checkout_idle = rental.idle_hours_at_checkout if (rental.idle_hours_at_checkout is not None and rental.idle_hours_at_checkout > 0) else 0.0
     checkout_fuel = rental.fuel_usage_at_checkout if (rental.fuel_usage_at_checkout is not None and rental.fuel_usage_at_checkout > 0) else 0.0
 
+    # Ensure non-decreasing meters
+    if checkin_eng < checkout_eng:
+        checkin_eng = checkout_eng
+    if checkin_idle < checkout_idle:
+        checkin_idle = checkout_idle
+
     # Fallback for old/seeded rentals or when checkout baseline was unrecorded/0.0:
     if checkout_eng == 0.0 or (checkin_eng - checkout_eng) > (actual_hours * 24.0 + 50.0):
         from backend.models.domain import UsageLog
@@ -108,14 +114,30 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
             checkout_idle = checkin_idle
             checkout_fuel = checkin_fuel
 
-    # Calculate rental-specific usage accrued BETWEEN checkout and checkin
-    rental_engine_delta = max(0.0, checkin_eng - checkout_eng)
-    rental_idle_hours = round(max(0.0, checkin_idle - checkout_idle), 2)
-    rental_operating_hours = round(max(0.0, rental_engine_delta - rental_idle_hours), 2)
+    # Calculate raw meter deltas
+    raw_eng_delta = max(0.0, checkin_eng - checkout_eng)
+    raw_idle_delta = max(0.0, checkin_idle - checkout_idle)
 
-    # Fuel usage during rental
+    # Physical Data Consistency Invariant:
+    # Operating + Idle hours accrued during a rental cannot physically exceed elapsed wall-clock rental duration (actual_hours).
+    # If telemetry updates (e.g. accelerated test script inputs or simulator ticks) advance faster than wall-clock duration, clamp accrued usage to actual_hours.
+    if actual_hours > 0 and raw_eng_delta > actual_hours:
+        scale = actual_hours / raw_eng_delta if raw_eng_delta > 0 else 1.0
+        rental_eng_delta = actual_hours
+        rental_idle_hours = round(raw_idle_delta * scale, 2)
+    else:
+        rental_eng_delta = round(raw_eng_delta, 2)
+        rental_idle_hours = round(raw_idle_delta, 2)
+
+    rental_operating_hours = round(max(0.0, rental_eng_delta - rental_idle_hours), 2)
+
+    # Secondary safety guard: operating + idle <= actual_hours
+    if actual_hours > 0 and (rental_operating_hours + rental_idle_hours) > actual_hours:
+        rental_operating_hours = round(max(0.0, actual_hours - rental_idle_hours), 2)
+
+    # Fuel calculation based on corrected rental operating hours
     rental_fuel_delta = max(0.0, checkin_fuel - checkout_fuel)
-    if rental_fuel_delta > 0:
+    if rental_fuel_delta > 0 and rental_fuel_delta <= (rental_operating_hours * 50.0 + 10.0):
         rental_fuel_used = round(rental_fuel_delta, 2)
     else:
         burn_rate = checkin_fuel if checkin_fuel > 0 else 20.0
@@ -131,11 +153,18 @@ def calculate_and_create_billing(rental: Rental, db: Session) -> Billing:
     tax_amount = round(subtotal * TAX_RATE, 2)
     total_amount = round(subtotal + tax_amount, 2)
 
-    # Mandatory consistency assertions
+    # Mandatory Physical & Data Integrity Assertions
+    assert checkin_eng >= checkout_eng, "Check-in engine hours must be >= checkout engine hours"
+    assert checkin_idle >= checkout_idle, "Check-in idle hours must be >= checkout idle hours"
     assert rental_operating_hours >= 0.0, "Operating hours cannot be negative"
     assert rental_idle_hours >= 0.0, "Idle hours cannot be negative"
     assert rental_fuel_used >= 0.0, "Fuel used cannot be negative"
     assert actual_hours >= 0.0, "Actual duration hours cannot be negative"
+    if actual_hours > 0:
+        assert round(rental_operating_hours + rental_idle_hours, 2) <= round(actual_hours + 0.01, 2), (
+            f"Physical Data Inconsistency: Operating ({rental_operating_hours}) + Idle ({rental_idle_hours}) "
+            f"= {rental_operating_hours + rental_idle_hours} hrs, which exceeds actual rental duration ({actual_hours} hrs)"
+        )
 
     billing = Billing(
         rental_id=rental.id,

@@ -70,10 +70,10 @@ class TelemetrySimulationEngine:
                         eq.longitude = round(eq.longitude + lng_delta, 6)
 
                         if eq.status == EquipmentStatus.IDLE:
-                            eq.idle_hours = round(eq.idle_hours + (0.01 * self.speed), 2)
+                            eq.idle_hours = round(eq.idle_hours + (0.0008 * self.speed), 4)
                         else:
-                            eq.engine_hours = round(eq.engine_hours + (0.02 * self.speed), 2)
-                            eq.idle_hours = round(eq.idle_hours + (0.002 * self.speed), 2)
+                            eq.engine_hours = round(eq.engine_hours + (0.0007 * self.speed), 4)
+                            eq.idle_hours = round(eq.idle_hours + (0.0001 * self.speed), 4)
 
                         eq.utilization = calculate_utilization(eq.engine_hours, eq.idle_hours)
 
